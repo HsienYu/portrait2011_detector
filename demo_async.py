@@ -47,7 +47,7 @@ async def detect_and_draw(cap, model, score_th, nms_th):
                 print("Moving forward")
                 # send a request to the server
                 asyncio.ensure_future(send_request(
-                    'https://duckduckgo.com/?t=osx'))
+                    'http://192.168.4.1/moving'))
                 current_state = state
 
         elif len(bboxes) == 0 and has_detected == True:
@@ -57,9 +57,16 @@ async def detect_and_draw(cap, model, score_th, nms_th):
                 print("No people found anymore, stopping the robot and crying")
                 # send a request to the server
                 asyncio.ensure_future(send_request(
-                    'https://duckduckgo.com/'))
+                    'http://192.168.4.1/stop_moving'))
+                print("Moving stop")
+                await asyncio.sleep(1)
                 asyncio.ensure_future(send_request(
-                    'https://duckduckgo.com/'))
+                    'http://192.168.4.1/crying'))
+                print("crying")
+                await asyncio.sleep(6)
+                asyncio.ensure_future(send_request(
+                    'http://192.168.4.1/stop_crying'))
+                print("stop crying")
                 current_state = state
 
         elapsed_time = time.time() - start_time

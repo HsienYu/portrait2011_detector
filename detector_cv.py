@@ -43,7 +43,7 @@ async def detect_people():
                 print("Moving forward")
                 # send a request to the server
                 asyncio.ensure_future(send_request(
-                    'https://duckduckgo.com/?t=osx'))
+                    'http://192.168.4.1/moving'))
                 current_state = state
 
         elif len(boxes) == 0 and has_detected == True:
@@ -53,9 +53,13 @@ async def detect_people():
                 print("No people found anymore, stopping the robot and crying")
                 # send a request to the server
                 asyncio.ensure_future(send_request(
-                    'https://duckduckgo.com/'))
+                    'http://192.168.4.1/stop_moving'))
+                await asyncio.sleep(1)
                 asyncio.ensure_future(send_request(
-                    'https://duckduckgo.com/'))
+                    'http://192.168.4.1/crying'))
+                await asyncio.sleep(6)
+                asyncio.ensure_future(send_request(
+                    'http://192.168.4.1/stop_crying'))
                 current_state = state
 
         cv2.imshow('frame', frame)
