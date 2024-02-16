@@ -11,23 +11,50 @@ cv2.startWindowThread()
 
 cap = cv2.VideoCapture(0)
 
+REQUEST_PEOPLE_URL = 'http://192.168.4.1/moving'
+REQUEST_STOP_MOVING_URL = 'http://192.168.4.1/stop_moving'
+REQUEST_CRYING_URL = 'http://192.168.4.1/crying'
+REQUEST_STOP_CRYING_URL = 'http://192.168.4.1/stop_crying'
+
+# REQUEST_PEOPLE_URL = 'http://google.com'
+# REQUEST_STOP_MOVING_URL = 'http://google.com'
+# REQUEST_CRYING_URL = 'http://google.com'
+# REQUEST_STOP_CRYING_URL = 'http://google.com'
+
+request_status = False
+has_request_been_sent = False
+has_tears = False
+no_person_start_time = None
+
 
 async def send_request(url):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            print(await response.text())
+    global request_status
+    global has_request_been_sent
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    print("Request sent successfully")
+                    request_status = True
+                    has_request_been_sent = False
+                else:
+                    print("Failed to send request")
+                    request_status = False
+                    has_request_been_sent = False
+
+    except aiohttp.ClientError as e:
+        print("Sending request failed:", str(e))
+        request_status = False
+        has_request_been_sent = False
 
 
 async def detect_people():
-
-    has_detected = False
+    global no_person_start_time
+    global has_tears
+    global request_status
+    global has_request_been_sent
 
     while True:
-
-        state = 0
-        current_state = 0
-        start_time = time.time()
-
         ret, frame = cap.read()
 
         frame = cv2.resize(frame, (640, 480))
@@ -40,34 +67,30 @@ async def detect_people():
         for (xA, yA, xB, yB) in boxes:
             cv2.rectangle(frame, (xA, yA), (xB, yB), (0, 255, 0), 2)
 
-        if len(boxes) > 0 and has_detected == False:
-            state = 1
-            has_detected = True
-            if current_state != state:
-                print("Found {} people".format(len(boxes)))
-                print("Moving forward")
-                # send a request to the server
-                asyncio.ensure_future(send_request(
-                    'http://192.168.4.1/moving'))
-                current_state = state
+        if len(boxes) > 0:
+            print("Found {} people".format(len(boxes)))
+            no_person_start_time = None
+            if not has_request_been_sent:
+                has_request_been_sent = True
+                asyncio.create_task(send_request(REQUEST_PEOPLE_URL))
+                print("Request status:", request_status)
+                has_tears = False
 
-        elif len(boxes) == 0 and has_detected == True:
-            state = 0
-            has_detected = False
-            if current_state != state:
-                print("No people found anymore, stopping the robot and crying")
-                # send a request to the server
-                asyncio.ensure_future(send_request(
-                    'http://192.168.4.1/stop_moving'))
-                await asyncio.sleep(1)
-                asyncio.ensure_future(send_request(
-                    'http://192.168.4.1/crying'))
-                await asyncio.sleep(6)
-                asyncio.ensure_future(send_request(
-                    'http://192.168.4.1/stop_crying'))
-                current_state = state
+        elif len(boxes) == 0:
+            if no_person_start_time is None:
+                no_person_start_time = time.time()  # Start measuring no person time
 
-        elapsed_time = time.time() - start_time
+            elapsed_no_person_time = time.time() - no_person_start_time
+            if elapsed_no_person_time >= 10 and not has_tears:
+                print("No person detected for 10 seconds")
+                # Do something when no person is detected for 10 seconds
+                if not has_request_been_sent:
+                    asyncio.create_task(send_request(REQUEST_STOP_MOVING_URL))
+                    await asyncio.sleep(5)
+                    asyncio.create_task(send_request(REQUEST_CRYING_URL))
+                    await asyncio.sleep(6)
+                    asyncio.create_task(send_request(REQUEST_STOP_CRYING_URL))
+                    has_tears = True
 
         cv2.imshow('frame', frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -80,6 +103,7 @@ async def main():
     await asyncio.gather(
         detect_people(),
     )
+
 
 if __name__ == '__main__':
     asyncio.run(main())
