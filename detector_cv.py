@@ -2,6 +2,7 @@ import asyncio
 import numpy as np
 import cv2
 import aiohttp
+import time
 
 hog = cv2.HOGDescriptor()
 hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
@@ -20,9 +21,13 @@ async def send_request(url):
 async def detect_people():
 
     has_detected = False
-    state = 0
-    current_state = 0
+
     while True:
+
+        state = 0
+        current_state = 0
+        start_time = time.time()
+
         ret, frame = cap.read()
 
         frame = cv2.resize(frame, (640, 480))
@@ -35,7 +40,7 @@ async def detect_people():
         for (xA, yA, xB, yB) in boxes:
             cv2.rectangle(frame, (xA, yA), (xB, yB), (0, 255, 0), 2)
 
-        if len(boxes) > 0:
+        if len(boxes) > 0 and has_detected == False:
             state = 1
             has_detected = True
             if current_state != state:
@@ -61,6 +66,8 @@ async def detect_people():
                 asyncio.ensure_future(send_request(
                     'http://192.168.4.1/stop_crying'))
                 current_state = state
+
+        elapsed_time = time.time() - start_time
 
         cv2.imshow('frame', frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
